@@ -16,7 +16,7 @@ To run:         **./install/QGroundControl/bin/QgroundControl**
 
 ##Building ViS in ROS 2 workspace:
 
-Download diux and diux msgs directories from [Bitbucket](http://devtools1.neyasystems.local:7990/projects/DUIX/repos/mavlink_vis/browse)  
+Download diux and diux msgs directories from [Bitbucket](https://github.com/neyaMavlinkViS/mavlinkViS)  
 Place diux and diuxmsgs directories in ~ros2_ws/src/ros2  
 Build diux msgs:        **colcon build --symlink-install --packages-select diux_msgs**  
 Run:        **. install/local_setup.bash**  
