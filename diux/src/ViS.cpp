@@ -16,8 +16,7 @@
 #include "diux_msgs/msg/global_pose_command_report_type.hpp"
 #include "diux_msgs/msg/global_pose_command_status_type.hpp"
 #include "diux_msgs/msg/geomagnetic_property_command_status_type.hpp"
-#include "diux_msgs/msg/wrench_effort_command_type.hpp"
-//#include <publishAndSubscribe.h>
+//#include <ViS.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -53,18 +52,22 @@ mavlink_status_t m_mavlink_status[MAVLINK_COMM_NUM_BUFFERS];
 
 bool hbCont = true;
 bool recieving = true;
-struct sockaddr_in myaddr, remaddr;
-int fd, i, slen=sizeof(remaddr);
+
 
 using namespace std;
 using namespace std::chrono_literals;
 
 
-class publishAndSubscribe
+
+
+
+
+
+class ViS
 {
 
 public:
-    publishAndSubscribe(std::string name);
+    ViS(std::string name);
 
     rclcpp::Node::SharedPtr m_node;
 
@@ -104,14 +107,12 @@ public:
     //void GeomagneticPropertyRequestTypeCallback(const diux_msgs::msg::GeomagneticPropertyRequestType::SharedPtr msg);
 
     void _handleGpsRawInt(mavlink_message_t message);
-    void _handleHeartbeat(mavlink_message_t& message);
     void recieveMessages(int slen, int fd, struct sockaddr_in remaddr);
+
+
+
+
     void sendHeartbeat(int slen, int fd, struct sockaddr_in remaddr);
-    void sendManualControl(float newPitchCommand, float newRollCommand, float newThrustCommand, float newYawCommand, int buttons);
-    void sendArmVehicle();
-
-    void WrenchEffortCommandTypeCallback(const diux_msgs::msg::WrenchEffortCommandType::SharedPtr msg);
-
 
 protected:
 
@@ -156,9 +157,7 @@ protected:
       //primitiveDrivers
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortRequestType>::SharedPtr m_wrenchEffortRequestTypeSub;
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortCommandRequestType>::SharedPtr m_wrenchEffortCommandRequestTypeSub;
-    */
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortCommandType>::SharedPtr m_wrenchEffortCommandTypeSub;
-/*
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortStatusType>::SharedPts m_wrenchEffortStatusTypeSub;
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortCommandReportType>::SharedPtr m_wrenchEffortCommandReportTypeSub;
     rclcpp::Subscription<diux_msgs::msg::WrenchEffortCommandStatusType>::SharedPtr m_wrenchEffortCommandStatusTypeSub;
@@ -167,13 +166,13 @@ protected:
 };
 
 
-//---------------------------------------------publishAndSubscribe CONSTRUCTOR---------------------------------------------//
+//---------------------------------------------ViS CONSTRUCTOR---------------------------------------------//
 
 
 
-//---------------------------------------------------------------------------------------------------------//
+//-------------------------------------------------------------------------------------------------------------------------//
 
-publishAndSubscribe::publishAndSubscribe(std::string name)
+ViS::ViS(std::string name)
 {
 
 
@@ -223,120 +222,31 @@ publishAndSubscribe::publishAndSubscribe(std::string name)
       //primitiveDrivers
     m_wrenchEffortRequestTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortRequestType>("set_wrench_effort_request_type");
     m_wrenchEffortCommandRequestTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortCommandRequestType>("set_wrench_effort_command_request_type");
-    */
-
-    m_wrenchEffortCommandTypeSub = m_node->create_subscription<diux_msgs::msg::WrenchEffortCommandType>( "set_wrench_effort_command_type", [this]( const diux_msgs::msg::WrenchEffortCommandType::SharedPtr msg) -> void
-     {
-       this->WrenchEffortCommandTypeCallback(msg);
-
-     } );
-
-    /*m_wrenchEffortStatusTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortStatusType>("set_wrench_effort_status_type");
+    m_wrenchEffortCommandTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortCommandType>("set_wrench_effort_command_type");
+    m_wrenchEffortStatusTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortStatusType>("set_wrench_effort_status_type");
     m_wrenchEffortCommandReportTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortCommandReportType>("set_wrench_effort_command_report_type");
     m_wrenchEffortCommandStatusTypeSub= m_node->create_subscription<diux_msgs::msg::WrenchEffortCommandStatusType>("set_wrench_effort_commandn_status_type");
 */
 };
 
 
-//------------------------------------------------------------------------------------------------------------------//
-
-                                      //~SENDING MAVLINK COMMANDS~//
-
-//------------------------------------------------------------------------------------------------------------------//
-
-
-//---------------------------------------------MAVLINK HEARBEAT---------------------------------------------//
-
-                //Sends Mavlink Heartbeat at 10Hz
-
-//----------------------------------------------------------------------------------------------------------//
-void publishAndSubscribe::sendHeartbeat(int slen, int fd, struct sockaddr_in remaddr )
-{
-  cout<<"HeartBeat Spinning Up \n";
-
-	while(hbCont)
-	{
-		char buf[BUFLEN];
-		uint8_t _vehicleSystemId = 1;
-		uint8_t _vehicleComponentId = 1;
-		uint8_t _mavlinkChannel = 2;
-		uint8_t _vehicleType = 6;
-		uint8_t _firmwareType = 8;
-		uint8_t _mavBaseMode = 192;
-		uint32_t _mavCustomMode = 0;
-		uint8_t _mavState = 4;
-
-		mavlink_message_t   msg;
-		mavlink_msg_heartbeat_pack_chan(_vehicleSystemId,_vehicleComponentId,_mavlinkChannel,&msg,_vehicleType,_firmwareType,_mavBaseMode,_mavCustomMode,_mavState);
-
-		int len = mavlink_msg_to_send_buffer(buf, &msg);
-
-		//SENDING//
-		if (sendto(fd, buf, len, 0, (struct sockaddr *)&remaddr, slen)==-1) {
-			perror("sendto");
-			exit(1);
-		}
-		usleep(100000);
-	}
-}
-
-
-//---------------------------------------------SEND MANUAL CONTROL---------------------------------------------//
-
-                //Sends Mavlink Heartbeat at 10Hz
-
-//-------------------------------------------------------------------------------------------------------------//
-void publishAndSubscribe::sendManualControl(float newPitchCommand, float newRollCommand, float newThrustCommand, float newYawCommand, int buttons)
-{
-	char buf[BUFLEN];
-	uint8_t _vehicleSystemId = 255;
-	uint8_t _vehicleComponentId = 0;
-	uint8_t _mavlinkChannel = 2;
-	uint8_t uasId = 1;
-
-	mavlink_message_t msg;
-	mavlink_msg_manual_control_pack_chan(_vehicleSystemId,_vehicleComponentId,_mavlinkChannel,&msg,uasId,newPitchCommand, newRollCommand, newThrustCommand, newYawCommand, buttons);
-
-	int len = mavlink_msg_to_send_buffer(buf, &msg);
-
-	if (sendto(fd, buf, len, 0, (struct sockaddr *)&remaddr, slen)==-1) {
-			perror("sendto");
-			exit(1);
-		}
-}
 
 
 
-  //---------------------------------------------DDS MESSAGE SUBSCRIPTION CALLBACKS---------------------------------------------//
+
+  //---------------------------------------------SUBSCRIBING TO DDS MESSAGES---------------------------------------------//
 
                   //subscribes to a DDS thread, recieves a message, and calls a mavlink send function
 
-  //----------------------------------------------------------------------------------------------------------------------------//
+  //---------------------------------------------------------------------------------------------------------------------//
 
-
-void publishAndSubscribe::WrenchEffortCommandTypeCallback(const diux_msgs::msg::WrenchEffortCommandType::SharedPtr msg)
+/*void ViS::GlobalPoseStatusTypeCallback(const diux_msgs::msg::GlobalPoseStatusType::SharedPtr msg)
 {
-    //cout<<"ManualControlMessage Recieved\n";
-    float newPitchCommand,newYawCommand,newRollCommand, newThrustCommand;
-    newPitchCommand = msg->propulsive_linear_effort.x_axis;
-    newYawCommand = msg->propulsive_linear_effort.y_axis;
-    newRollCommand = msg->propulsive_rotational_effort.roll_effort;
-    newThrustCommand = msg->propulsive_linear_effort.z_axis;
-    newPitchCommand = newPitchCommand*1000;
-    newYawCommand = newYawCommand * 1000;
-    newRollCommand = newRollCommand*1000;
-    newThrustCommand = newThrustCommand*1000;
-    //cout<<newPitchCommand<<"\n";
-    //cout<<newYawCommand<<"\n";
-    //cout<<newRollCommand<<"\n";
-    //cout<<newThrustCommand<<"\n";
-    sendManualControl(newPitchCommand,newRollCommand,newThrustCommand, newYawCommand,0);
-    //sendManualControl(1000,1000,0, -7.8,0);
+
+  //TODO call mavlink send fn
+
 }
-
-
-
-
+*/
 
 
 //---------------------------------------------PUBLISHING DDS MESSAGES---------------------------------------------//
@@ -344,7 +254,7 @@ void publishAndSubscribe::WrenchEffortCommandTypeCallback(const diux_msgs::msg::
                 //takes a mavlink decoded message, translates to a DDS message, and publishes the DDS message
 
 //-----------------------------------------------------------------------------------------------------------------//
-/*void publishAndSubscribe::MavlinkGeomagneticPropertyCommandStatusCallback( mavlink_geomagnetic_type_t mavlink_msg )
+/*void ViS::MavlinkGeomagneticPropertyCommandStatusCallback( mavlink_geomagnetic_type_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -357,7 +267,7 @@ void publishAndSubscribe::WrenchEffortCommandTypeCallback(const diux_msgs::msg::
 */
 
 /*
-void publishAndSubscribe::MavlinkHeartbeatCallback( mavlink_heartbeat_t mavlink_msg )
+void ViS::MavlinkHeartbeatCallback( mavlink_heartbeat_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -369,7 +279,7 @@ void publishAndSubscribe::MavlinkHeartbeatCallback( mavlink_heartbeat_t mavlink_
 }
 */
 /*
-void publishAndSubscribe::MavlinkRCChannelsCallback( mavlink_heartbeat_t mavlink_msg )
+void ViS::MavlinkRCChannelsCallback( mavlink_heartbeat_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -381,7 +291,7 @@ void publishAndSubscribe::MavlinkRCChannelsCallback( mavlink_heartbeat_t mavlink
 }
 */
 /*
-void publishAndSubscribe::MavlinkRCChannelsRawCallback( mavlink_heartbeat_t mavlink_msg )
+void ViS::MavlinkRCChannelsRawCallback( mavlink_heartbeat_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -393,7 +303,7 @@ void publishAndSubscribe::MavlinkRCChannelsRawCallback( mavlink_heartbeat_t mavl
 }
 */
 /*
-void publishAndSubscribe::MavlinkBatteryStatusCallback(mavlink_battery_status_t mavlink_msg )
+void ViS::MavlinkBatteryStatusCallback(mavlink_battery_status_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -405,7 +315,7 @@ void publishAndSubscribe::MavlinkBatteryStatusCallback(mavlink_battery_status_t 
 }
 */
 /*
-void publishAndSubscribe::MavlinkSysStatusCallback( mavlink_sys_status_t mavlink_msg )
+void ViS::MavlinkSysStatusCallback( mavlink_sys_status_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -417,80 +327,7 @@ void publishAndSubscribe::MavlinkSysStatusCallback( mavlink_sys_status_t mavlink
 }
 */
 /*
-void publishAndSubscribe::MavlinkVibrationCallback( mavlink_vibration_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-
-void publishAndSubscribe::MavlinkExtendedSysStateCallback( mavlink_extended_sys_state_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-void publishAndSubscribe::MavlinkCommandAckCallback( mavlink_command_ack_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-void publishAndSubscribe::MavlinkCommandLongCallback( mavlink_command_long_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-void publishAndSubscribe::MavlinkAutopilotVersionCallback( mavlink_autopilot_version_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-void publishAndSubscribe::MavlinkWindCovCallback( mavlink_wind_cov_t mavlink_msg )
-{
-    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
-
-    ros2_msg.x = mavlink_msg.x;
-    ros2_msg.y = mavlink_msg.y;
-    ros2_msg.z = mavlink_msg.z;
-
-    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
-}
-*/
-/*
-void publishAndSubscribe::MavlinkHilActuatorControlsCallback( mavlink_hil_actuator_controls_t mavlink_msg )
+void ViS::MavlinkVibrationCallback( mavlink_vibration_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -503,7 +340,7 @@ void publishAndSubscribe::MavlinkHilActuatorControlsCallback( mavlink_hil_actuat
 */
 /*
 
-void publishAndSubscribe::MavlinkLoggingDataCallback( mavlink_logging_data_t mavlink_msg )
+void ViS::MavlinkExtendedSysStateCallback( mavlink_extended_sys_state_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -515,7 +352,80 @@ void publishAndSubscribe::MavlinkLoggingDataCallback( mavlink_logging_data_t mav
 }
 */
 /*
-void publishAndSubscribe::MavlinkLoggingDataAckedCallback( mavlink_loggging_data_acked mavlink_msg )
+void ViS::MavlinkCommandAckCallback( mavlink_command_ack_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+void ViS::MavlinkCommandLongCallback( mavlink_command_long_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+void ViS::MavlinkAutopilotVersionCallback( mavlink_autopilot_version_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+void ViS::MavlinkWindCovCallback( mavlink_wind_cov_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+void ViS::MavlinkHilActuatorControlsCallback( mavlink_hil_actuator_controls_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+
+void ViS::MavlinkLoggingDataCallback( mavlink_logging_data_t mavlink_msg )
+{
+    diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
+
+    ros2_msg.x = mavlink_msg.x;
+    ros2_msg.y = mavlink_msg.y;
+    ros2_msg.z = mavlink_msg.z;
+
+    m_geomagneticPropertyCommandStatusTypePub->publish(ros2_msg);
+}
+*/
+/*
+void ViS::MavlinkLoggingDataAckedCallback( mavlink_loggging_data_acked mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -527,8 +437,8 @@ void publishAndSubscribe::MavlinkLoggingDataAckedCallback( mavlink_loggging_data
 }
 */
 
-void publishAndSubscribe::MavlinkGpsRawIntCallback( mavlink_gps_raw_int_t mavlink_msg )
-{   //cout<<"\t Callback";
+void ViS::MavlinkGpsRawIntCallback( mavlink_gps_raw_int_t mavlink_msg )
+{   cout<<"\t Callback";
     diux_msgs::msg::GlobalPoseStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GlobalPoseStatusType>();
 
     ros2_msg->altitude.altitude = mavlink_msg.alt;
@@ -553,12 +463,12 @@ void publishAndSubscribe::MavlinkGpsRawIntCallback( mavlink_gps_raw_int_t mavlin
     ros2_msg->xy_position_rms.position_error = 0;
     ros2_msg->z_position_rms.distance_error = 0;
 
-    //cout<<"\tpublishing\n";
+    cout<<"\tpublishing\n";
     m_globalPoseStatusTypePub->publish(ros2_msg);
 }
 
 /*
-void publishAndSubscribe::MavlinkGlobalPositionIntCallback( mavlink_global_position_int_t mavlink_msg )
+void ViS::MavlinkGlobalPositionIntCallback( mavlink_global_position_int_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -570,7 +480,7 @@ void publishAndSubscribe::MavlinkGlobalPositionIntCallback( mavlink_global_posit
 }
 */
 /*
-void publishAndSubscribe::MavlinkAltitudeCallback( mavlink_attitude_t mavlink_msg )
+void ViS::MavlinkAltitudeCallback( mavlink_attitude_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -582,7 +492,7 @@ void publishAndSubscribe::MavlinkAltitudeCallback( mavlink_attitude_t mavlink_ms
 }
 */
 /*
-void publishAndSubscribe::MavlinkVfrHudCallback( mavlink_vfr_hud_t mavlink_msg )
+void ViS::MavlinkVfrHudCallback( mavlink_vfr_hud_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -594,7 +504,7 @@ void publishAndSubscribe::MavlinkVfrHudCallback( mavlink_vfr_hud_t mavlink_msg )
 }
 */
 /*
-void publishAndSubscribe::MavlinkScaledPressureCallback( mavlink_scaled_pressure_t mavlink_msg )
+void ViS::MavlinkScaledPressureCallback( mavlink_scaled_pressure_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -606,7 +516,7 @@ void publishAndSubscribe::MavlinkScaledPressureCallback( mavlink_scaled_pressure
 }
 */
 /*
-void publishAndSubscribe::MavlinkScaledPressure2Callback( mavlink_scaled_pressure2_t mavlink_msg )
+void ViS::MavlinkScaledPressure2Callback( mavlink_scaled_pressure2_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -618,7 +528,7 @@ void publishAndSubscribe::MavlinkScaledPressure2Callback( mavlink_scaled_pressur
 }
 */
 /*
-void publishAndSubscribe::MavlinkScaledPressure3Callback( mavlink_scaled_pressure3_t mavlink_msg )
+void ViS::MavlinkScaledPressure3Callback( mavlink_scaled_pressure3_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -630,7 +540,7 @@ void publishAndSubscribe::MavlinkScaledPressure3Callback( mavlink_scaled_pressur
 }
 */
 /*
-void publishAndSubscribe::MavlinkCameraImageCapturedCallback( mavlink_camera_image_captured_t mavlink_msg )
+void ViS::MavlinkCameraImageCapturedCallback( mavlink_camera_image_captured_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -642,7 +552,7 @@ void publishAndSubscribe::MavlinkCameraImageCapturedCallback( mavlink_camera_ima
 }
 */
 /*
-void publishAndSubscribe::MavlinkADSBVehicleCallback( mavlink_adsb_vehicle_t mavlink_msg )
+void ViS::MavlinkADSBVehicleCallback( mavlink_adsb_vehicle_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -654,7 +564,7 @@ void publishAndSubscribe::MavlinkADSBVehicleCallback( mavlink_adsb_vehicle_t mav
 }
 */
 /*
-void publishAndSubscribe::MavlinkHighLatency2Callback( mavlink_high_latency2_t mavlink_msg )
+void ViS::MavlinkHighLatency2Callback( mavlink_high_latency2_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -666,7 +576,7 @@ void publishAndSubscribe::MavlinkHighLatency2Callback( mavlink_high_latency2_t m
 }
 */
 /*
-void publishAndSubscribe::MavlinkAttitudeCallback( mavlink_attitude_t mavlink_msg )
+void ViS::MavlinkAttitudeCallback( mavlink_attitude_t mavlink_msg )
 {
     diux_msgs::msg::GlobalPoseCommandType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GlobalPoseCommandType>();
 
@@ -679,7 +589,7 @@ void publishAndSubscribe::MavlinkAttitudeCallback( mavlink_attitude_t mavlink_ms
 }
 */
 /*
-void publishAndSubscribe::MavlinkAttitudeQuaternionCallback( mavlink_attitude_quaternion_t mavlink_msg )
+void ViS::MavlinkAttitudeQuaternionCallback( mavlink_attitude_quaternion_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -691,7 +601,7 @@ void publishAndSubscribe::MavlinkAttitudeQuaternionCallback( mavlink_attitude_qu
 }
 */
 /*
-void publishAndSubscribe::MavlinkAttitudeTargetCallback( mavlink_attitude_target_t mavlink_msg )
+void ViS::MavlinkAttitudeTargetCallback( mavlink_attitude_target_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -703,7 +613,7 @@ void publishAndSubscribe::MavlinkAttitudeTargetCallback( mavlink_attitude_target
 }
 */
 /*
-void publishAndSubscribe::MavlinkEstimatorStatusCallback( mavlink_estimator_status_t mavlink_msg )
+void ViS::MavlinkEstimatorStatusCallback( mavlink_estimator_status_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -715,7 +625,7 @@ void publishAndSubscribe::MavlinkEstimatorStatusCallback( mavlink_estimator_stat
 }
 */
 /*
-void publishAndSubscribe::MavlinkStatusTextCallback( mavlink_statustext_t mavlink_msg )
+void ViS::MavlinkStatusTextCallback( mavlink_statustext_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -727,7 +637,7 @@ void publishAndSubscribe::MavlinkStatusTextCallback( mavlink_statustext_t mavlin
 }
 */
 /*
-void publishAndSubscribe::MavlinkOrbitExecutionStatusCallback( mavlink_orbit_execution_status_t mavlink_msg )
+void ViS::MavlinkOrbitExecutionStatusCallback( mavlink_orbit_execution_status_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -739,7 +649,7 @@ void publishAndSubscribe::MavlinkOrbitExecutionStatusCallback( mavlink_orbit_exe
 }
 */
 /*
-void publishAndSubscribe::MavlinkDistanceSensorCallback( mavlink_distance_sensor_t mavlink_msg )
+void ViS::MavlinkDistanceSensorCallback( mavlink_distance_sensor_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -751,7 +661,7 @@ void publishAndSubscribe::MavlinkDistanceSensorCallback( mavlink_distance_sensor
 }
 */
 /*
-void publishAndSubscribe::MavlinkHomePositionCallback( mavlink_home_position_t mavlink_msg )
+void ViS::MavlinkHomePositionCallback( mavlink_home_position_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -763,7 +673,7 @@ void publishAndSubscribe::MavlinkHomePositionCallback( mavlink_home_position_t m
 }
 */
 /*
-void publishAndSubscribe::MavlinkRadioStatusCallback( mavlink_radio_status_t mavlink_msg )
+void ViS::MavlinkRadioStatusCallback( mavlink_radio_status_t mavlink_msg )
 {
     diux_msgs::msg::GeomagneticPropertyCommandStatusType::SharedPtr ros2_msg = std::make_shared<diux_msgs::msg::GeomagneticPropertyCommandStatusType>();
 
@@ -780,15 +690,15 @@ void publishAndSubscribe::MavlinkRadioStatusCallback( mavlink_radio_status_t mav
                 //takes a recieved mavlink message, decodes it, and calls a MavlinkCallback function
 
 //-------------------------------------------------------------------------------------------------------------------//
-
-void publishAndSubscribe::_handleHeartbeat(mavlink_message_t& message)
+/*
+void _handleHeartbeat(mavlink_message_t& message)
 {
     mavlink_heartbeat_t heartbeat;
     mavlink_msg_heartbeat_decode(&message, &heartbeat);
-    int a = heartbeat.base_mode;
-    std::cout<<"BaseMode\t"<<(a)<<"\n";
+    int a = heartbeat.system_status;
+    std::cout<<(a)<<"\n";
 }
-
+*/
 /*
 void _handleRCChannels(mavlink_message_t& message)
 {
@@ -890,11 +800,11 @@ _handleMavlinkLoggingDataAcked(mavlink_message_t& message)
 }
 */
 
-void publishAndSubscribe::_handleGpsRawInt(mavlink_message_t message)
+void ViS::_handleGpsRawInt(mavlink_message_t message)
 {
 	mavlink_gps_raw_int_t gpsRawInt;
 	mavlink_msg_gps_raw_int_decode(&message, &gpsRawInt);
-  //cout<<"handlingGpsRawInt";
+  cout<<"handlingGpsRawInt";
   MavlinkGpsRawIntCallback(gpsRawInt);
 }
 
@@ -1055,7 +965,7 @@ void _handleRadioStatus(mavlink_message_t& message)
 
 //--------------------------------------------------------------------------------------------------------------------//
 
-void publishAndSubscribe::recieveMessages(int slen, int fd, struct sockaddr_in remaddr)
+void ViS::recieveMessages(int slen, int fd, struct sockaddr_in remaddr)
 {	char buf[BUFLEN];
 	int recvlen;
 
@@ -1083,7 +993,7 @@ void publishAndSubscribe::recieveMessages(int slen, int fd, struct sockaddr_in r
 					break;
 				    case MAVLINK_MSG_ID_HEARTBEAT:
             //cout<<"1\n";
-          _handleHeartbeat(message);
+          //_handleHeartbeat(message);
 					break;
 				    case MAVLINK_MSG_ID_RADIO_STATUS:
             //cout<<"2\n";
@@ -1228,33 +1138,42 @@ void publishAndSubscribe::recieveMessages(int slen, int fd, struct sockaddr_in r
 
 }
 
-void publishAndSubscribe::sendArmVehicle()
+
+//---------------------------------------------MAVLINK HEARBEAT---------------------------------------------//
+
+                //Sends Mavlink Heartbeat at 10Hz
+
+//----------------------------------------------------------------------------------------------------------//
+void ViS::sendHeartbeat(int slen, int fd, struct sockaddr_in remaddr )
 {
+  cout<<"HeartBeat Spinning Up \n";
 
-	char buf2[BUFLEN];
-	uint8_t _vehicleSystemId = 255;
-	uint8_t _vehicleComponentId = 1;
-	uint8_t _mavlinkChannel = 2;
-	uint8_t _vehicleType = 135;
-	uint8_t _firmwareType = 0;
-	uint8_t _mavBaseMode = 0;
-	uint32_t _mavCustomMode = 0;
-	uint8_t _mavState = 4;
+	while(hbCont)
+	{
+		char buf[BUFLEN];
+		uint8_t _vehicleSystemId = 1;
+		uint8_t _vehicleComponentId = 1;
+		uint8_t _mavlinkChannel = 2;
+		uint8_t _vehicleType = 6;
+		uint8_t _firmwareType = 8;
+		uint8_t _mavBaseMode = 192;
+		uint32_t _mavCustomMode = 0;
+		uint8_t _mavState = 4;
 
-	usleep(100000);
+		mavlink_message_t   msg;
+		mavlink_msg_heartbeat_pack_chan(_vehicleSystemId,_vehicleComponentId,_mavlinkChannel,&msg,_vehicleType,_firmwareType,_mavBaseMode,_mavCustomMode,_mavState);
 
-	mavlink_message_t   msg2;
-	mavlink_msg_command_long_pack(255, _vehicleComponentId, &msg2, 1, 0, MAV_CMD_COMPONENT_ARM_DISARM, true, 1, 0,0, 0,0,0,0);
+		int len = mavlink_msg_to_send_buffer(buf, &msg);
 
-	int len = mavlink_msg_to_send_buffer(buf2, &msg2);
-
-	//SENDING//
-	if (sendto(fd, buf2, len, 0, (struct sockaddr *)&remaddr, slen)==-1) {
-		perror("sendto");
-		exit(1);
+		//SENDING//
+		if (sendto(fd, buf, len, 0, (struct sockaddr *)&remaddr, slen)==-1) {
+			perror("sendto");
+			exit(1);
+		}
+		usleep(100000);
 	}
-
 }
+
 
 //---------------------------------------------MAIN---------------------------------------------//
 
@@ -1265,9 +1184,9 @@ void publishAndSubscribe::sendArmVehicle()
 int main(int argc, char * argv[])
 {
     //BUILDING UDP CONNECTION//
-/*  struct sockaddr_in myaddr, remaddr;
+  struct sockaddr_in myaddr, remaddr;
   int fd, i, slen=sizeof(remaddr);
-*/
+
   int recvlen;
   const char *server = "127.0.0.1";	// change this to use a different server //
 
@@ -1301,12 +1220,12 @@ int main(int argc, char * argv[])
 
 
   rclcpp::init(argc, argv);
-  publishAndSubscribe * translationLayer = new publishAndSubscribe("task");
+  ViS * translationLayer = new ViS("task");
   //WHERE TO PUT THE INIT, DOES SPIN LOOP, OR WILL IT ALLOW NEXT CODE TO BE EXECUTED//
 
-  std::thread t1 (&publishAndSubscribe::sendHeartbeat, translationLayer, slen, fd, remaddr);
-  std::thread t2 (&publishAndSubscribe::recieveMessages,translationLayer, slen, fd, remaddr);
-  translationLayer->sendArmVehicle();
+  std::thread t1 (&ViS::sendHeartbeat, translationLayer, slen, fd, remaddr);
+  std::thread t2 (&ViS::recieveMessages,translationLayer, slen, fd, remaddr);
+
 
   rclcpp::spin(translationLayer->m_node);
 

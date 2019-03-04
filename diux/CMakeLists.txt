@@ -65,22 +65,6 @@ ament_target_dependencies(subscriberTest
 install(TARGETS subscriberTest
     DESTINATION bin)
 
-#manualControl
-
-add_executable(manualControlPublish
-  src/manualControlPublish.cpp
-)
-
-ament_target_dependencies(manualControlPublish
-  "rclcpp"
-  "diux_msgs"
-)
-
-install(TARGETS manualControlPublish
-    DESTINATION bin)
-#end
-
-
 
 
 # Start of GlobalPoseSensor

@@ -53,7 +53,7 @@ mavlink_status_t m_mavlink_status[MAVLINK_COMM_NUM_BUFFERS];
 
 bool hbCont = true;
 bool recieving = true;
-int i = 0;
+
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -101,12 +101,12 @@ subscriberTest::subscriberTest(std::string name)
   //---------------------------------------------------------------------------------------------------------------------//
 
 void subscriberTest::GlobalPoseStatusTypeCallback(const diux_msgs::msg::GlobalPoseStatusType::SharedPtr msg)
-{ cout<<"\n "<<i<<": \n";
+{
   cout<<"Latitude: \t";
   cout << msg->position.geodetic_position.geodetic_latitude.latitude << std::endl;
   cout<<"Longitude: \t";
-  cout<<msg->position.geodetic_position.geodetic_longitude.longitude << std::endl;
-  i++;
+  cout<<msg->position.geodetic_position.geodetic_longitude.longitude << std::endl; 
+
 }
 
 
