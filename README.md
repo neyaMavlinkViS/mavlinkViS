@@ -6,14 +6,6 @@ notes: follow the instructions for setting locale on the link above, but then ad
 
 **After Installing ROS 2**  
 
-**Building QGroundControl in ROS 2 workspace:**  
-
-Download QGroundControl directory from bitbucket()  
-Place the QGroundControl directory in ~ros2_ws/src/ros2  
-To build:         **colcon build --symlink-install --packages-select QGroundControl**  
-Before running:         **. install/local_setup.bash**  
-To run:         **./install/QGroundControl/bin/QgroundControl**  
-
 **Building ViS in ROS 2 workspace:**  
 
 Download diux and diux msgs directories from [github](https://github.com/neyaMavlinkViS/mavlinkViS)  
